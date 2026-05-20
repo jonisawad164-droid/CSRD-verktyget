@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CSRD-verktyget</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f3f6f4;color:#111;font-size:14px}
+input,select,button{font-family:inherit;font-size:14px}
+input[type=number]::-webkit-inner-spin-button{opacity:1}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:10px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+"use strict";
+var h = React.createElement;
+var useState = React.useState;
+var useRef   = React.useRef;
+var useEffect= React.useEffect;
+
+// ── Färger ────────────────────────────────────────────────────────────────────
+var G = "#0d4f2f", GL = "#1a7a4e", GP = "#e8f5ee";
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+var QS = [
+  {id:1, cat:"Organisation", q:"Har ni en utsedd ansvarig för hållbarhetsrapportering?"},
+  {id:2, cat:"Miljö",        q:"Samlar ni in data om koldioxidutsläpp (Scope 1 & 2)?"},
+  {id:3, cat:"Miljö",        q:"Mäter ni energiförbrukning kontinuerligt per enhet/fastighet?"},
+  {id:4, cat:"Miljö",        q:"Har ni definierade klimatmål med mätbara delmål?"},
+  {id:5, cat:"Socialt",      q:"Har ni en dokumenterad jämställdhets- och mångfaldspolicy?"},
+  {id:6, cat:"Socialt",      q:"Mäter ni sjukfrånvaro och medarbetarnöjdhet regelbundet?"},
+  {id:7, cat:"Socialt",      q:"Har ni hållbarhetskrav på era leverantörer (due diligence)?"},
+  {id:8, cat:"Styrning",     q:"Rapporteras hållbarhetsdata regelbundet till styrelsen?"},
+  {id:9, cat:"Styrning",     q:"Har ni anti-korruptionspolicy och whistleblower-system?"},
+  {id:10,cat:"Rapportering", q:"Är er hållbarhetsdata verifierad av extern revisor?"},
+  {id:11,cat:"Rapportering", q:"Har ni genomfört en analys av dubbel väsentlighet?"},
+  {id:12,cat:"Rapportering", q:"Publicerar ni redan en hållbarhetsrapport?"},
+];
+var CATS = ["Organisation","Miljö","Socialt","Styrning","Rapportering"];
+
+// ── Hjälpfunktioner ───────────────────────────────────────────────────────────
+function score(a){ return Object.values(a).filter(function(v){return v===true;}).length; }
+function status(s){
+  if(s<=3) return {label:"Inte redo",    c:"#dc2626", bg:"#fef2f2"};
+  if(s<=6) return {label:"Tidigt skede", c:"#d97706", bg:"#fffbeb"};
+  if(s<=9) return {label:"På god väg",   c:"#2563eb", bg:"#eff6ff"};
+  return         {label:"Nästan redo",  c:"#16a34a", bg:"#f0fdf4"};
+}
+function catScores(a){
+  var m={};
+  QS.forEach(function(q){
+    if(!m[q.cat]) m[q.cat]={y:0,t:0};
+    m[q.cat].t++;
+    if(a[q.id]===true) m[q.cat].y++;
+  });
+  return CATS.map(function(c){ return m[c] ? Math.round(m[c].y/m[c].t*100) : 0; });
+}
+function recs(a, esg){
+  var r=[];
+  // PRIORITET HÖG
+  if(a[11]===false) r.push({
+    pri:"HÖG", priC:"#dc2626", priBg:"#fef2f2", i:"🔍",
+    t:"Genomför dubbel väsentlighetsanalys",
+    d:"Identifiera vilka hållbarhetsrisker som är väsentliga – er påverkan på omvärlden och omvärldens påverkan på er. Allt CSRD-arbete bygger på denna analys.",
+    steps:["Kartlägg intressenter: kunder, anställda, investerare, lokalmiljö","Bedöm er påverkan på miljö och samhälle (impact materiality)","Bedöm hållbarhetsrisker och möjligheter för er (financial materiality)","Dokumentera och låt analysen granskas av revisor"],
+    effort:"Hög (2–4 veckor)", e:"ESRS 2 – IRO-1"
+  });
+  if(a[1]===false) r.push({
+    pri:"HÖG", priC:"#dc2626", priBg:"#fef2f2", i:"👤",
+    t:"Utse en CSRD-ansvarig",
+    d:"Utan en tydlig ägare stagnerar CSRD-arbetet. Rollen kan vara CFO, hållbarhetschef eller en dedikerad koordinator beroende på bolagets storlek.",
+    steps:["Definiera ansvar och mandat i en rollbeskrivning","Ge rollen budget och tid – minst 20% av en tjänst för medelstort bolag","Koppla rollen till styrelse och revisor","Skapa ett tvärfunktionellt CSRD-team (HR, finans, verksamhet)"],
+    effort:"Låg–medel (1 vecka)", e:"ESRS 2 – GOV-1"
+  });
+  if(a[10]===false) r.push({
+    pri:"HÖG", priC:"#dc2626", priBg:"#fef2f2", i:"✅",
+    t:"Förbered för extern verifiering",
+    d:"CSRD kräver begränsad säkerhet (limited assurance) av revisor fr.o.m. 2025. Revisorerna behöver spårbara datakällor och dokumenterade metoder.",
+    steps:["Dokumentera varje datapunkt: källa, beräkningsmetod, ansvarig person","Upprätta ett internt kontrollsystem för ESG-data","Boka möte med er revisor redan nu för att förstå deras krav","Planera för reasonable assurance (full granskning) fr.o.m. 2028"],
+    effort:"Hög (löpande)", e:"ESRS 2 – BP-2"
+  });
+  // PRIORITET MEDEL
+  if(a[2]===false||a[3]===false) r.push({
+    pri:"MEDEL", priC:"#d97706", priBg:"#fffbeb", i:"🌡️",
+    t:"Starta systematisk klimatdatainsamling",
+    d:"Scope 1 och Scope 2 är grundläggande CSRD-krav. Utan dessa kan ni inte beräkna klimatavtryck, sätta mål eller jämföra med bransch.",
+    steps:["Scope 1: Samla bränsleförbrukning (diesel, gas, olja) från leverantörsfakturor","Scope 2: Begär emissionsfaktorer från el- och fjärrvärmeleverantör","Välj beräkningsstandard: GHG Protocol (vanligast i Sverige)","Implementera ett enkelt mätsystem – Excel duger i ett första steg"],
+    effort:"Medel (3–6 veckor)", e:"ESRS E1 – E1-6"
+  });
+  if(a[4]===false) r.push({
+    pri:"MEDEL", priC:"#d97706", priBg:"#fffbeb", i:"🎯",
+    t:"Definiera mätbara klimatmål",
+    d:"CSRD kräver att ni redovisar klimatmål med tydlig tidshorisont. Målen ska vara kopplade till Parisavtalet och 1,5°C-banan.",
+    steps:["Sätt ett basår (helst 2019 eller 2020) för jämförelse","Definiera mål för Scope 1+2: t.ex. -46% till 2030 (SBTi-standard)","Inkludera Scope 3 i planen om ni är ett stort bolag","Besluta målen i styrelsen och publicera dem"],
+    effort:"Medel (2–3 veckor)", e:"ESRS E1 – E1-4"
+  });
+  if(a[5]===false) r.push({
+    pri:"MEDEL", priC:"#d97706", priBg:"#fffbeb", i:"⚖️",
+    t:"Ta fram jämställdhets- och mångfaldspolicy",
+    d:"ESRS S1 kräver dokumenterade policyer för lika möjligheter, icke-diskriminering och mångfald. Policyn ska täcka hela organisationen.",
+    steps:["Kartlägg nuläge: könsfördelning per nivå, löneskillnader, nationalitet","Formulera konkreta mål med tidsplan (t.ex. 40% kvinnor i ledning till 2027)","Förankra policy i HR-processer: rekrytering, lön, befordran","Rapportera utfall varje år i hållbarhetsrapporten"],
+    effort:"Låg–medel (1–2 veckor)", e:"ESRS S1 – S1-1"
+  });
+  if(a[7]===false) r.push({
+    pri:"MEDEL", priC:"#d97706", priBg:"#fffbeb", i:"🔗",
+    t:"Inför ESG-krav i leverantörskedjan",
+    d:"CSRD kräver due diligence även för leverantörer. Väsentliga hållbarhetsrisker i värdekedjan ska identifieras och hanteras.",
+    steps:["Kartlägg era 20 viktigaste leverantörer ur hållbarhetsperspektiv","Skicka ESG-enkät eller kräv certifiering (ISO 14001, SA8000)","Inför ESG-klausuler i nya leverantörsavtal","Planera för Scope 3-rapportering (inköpta varor och tjänster)"],
+    effort:"Hög (löpande)", e:"ESRS S2 – S2-1, ESRS E1 Scope 3"
+  });
+  if(a[8]===false) r.push({
+    pri:"MEDEL", priC:"#d97706", priBg:"#fffbeb", i:"📋",
+    t:"Integrera ESG i styrelserapportering",
+    d:"Styrelsen är enligt CSRD ytterst ansvarig för hållbarhetsstrategin. ESG-data ska vara lika naturlig som finansiell data i styrelserummet.",
+    steps:["Lägg till ett hållbarhetsavsnitt i varje styrelseprotokoll","Rapportera minst: klimatutsläpp, personaldata, incidenter, avvikelser mot mål","Utbilda styrelseledamöter i CSRD-krav och ESG-terminologi","Koppla ledningens ersättning till hållbarhetsmål (allt vanligare)"],
+    effort:"Låg (strukturfråga)", e:"ESRS 2 – GOV-2"
+  });
+  if(a[9]===false) r.push({
+    pri:"MEDEL", priC:"#d97706", priBg:"#fffbeb", i:"🚫",
+    t:"Implementera anti-korruptionspolicy och whistleblower",
+    d:"ESRS G1 kräver dokumenterade policyer mot korruption och mutor, samt ett system för visselblåsning som uppfyller EU:s direktiv (2019/1937).",
+    steps:["Upprätta eller uppdatera anti-korruptionspolicyn – inkludera gåvor, representation, intressekonflikter","Implementera ett digitalt whistleblower-system (t.ex. WhistleB, Navex)","Utbilda all personal – dokumentera utbildningen","Genomför riskbedömning av korruptionsrisker per land/affärsområde"],
+    effort:"Medel (4–6 veckor)", e:"ESRS G1 – G1-1, G1-3"
+  });
+  // PRIORITET LÅG / DATA
+  if(!esg.scope1&&!esg.scope2) r.push({
+    pri:"DATA", priC:"#7c3aed", priBg:"#f5f3ff", i:"📊",
+    t:"Fyll i Scope 1 & 2-utsläpp i ESG-data",
+    d:"Ni har ännu inte angivet era utsläppsdata i verktyget. Gå till fliken ESG-data och fyll i Scope 1 och Scope 2 för att aktivera utsläppsanalysen.",
+    steps:["Gå till ESG-data → Miljö (E)","Hämta Scope 1-data från bränsleleverantörer","Hämta Scope 2-data från el/fjärrvärmeleverantör","Uppdatera varje år"],
+    effort:"Låg", e:"ESRS E1"
+  });
+  if(!esg.employees) r.push({
+    pri:"DATA", priC:"#7c3aed", priBg:"#f5f3ff", i:"👥",
+    t:"Fyll i personaldata i ESG-data",
+    d:"Personaldata saknas i verktyget. ESRS S1 kräver ett brett spektrum av nyckeltal om era anställda.",
+    steps:["Gå till ESG-data → Socialt (S)","Hämta data från HR-systemet","Fyll i: antal anställda, könsfördelning, sjukfrånvaro, utbildningstimmar","Kontrollera mot lönesystem och avtal"],
+    effort:"Låg", e:"ESRS S1"
+  });
+  if(r.length===0) r.push({
+    pri:"BRA", priC:"#16a34a", priBg:"#f0fdf4", i:"🎉",
+    t:"Ni är väl förberedda!",
+    d:"Er beredskap är hög och datainmatningen är komplett. Fokusera nu på att kvalitetssäkra data, förbereda för extern granskning och publicera er första hållbarhetsrapport.",
+    steps:["Anlita en revisor för limited assurance av ESG-data","Skriv berättande delar till hållbarhetsrapporten","Publicera rapporten i årsredovisningen","Planera för Scope 3-kartläggning nästa år"],
+    effort:"Löpande", e:"ESRS 2"
+  });
+  return r;
+}
+function esrsStatus(a, esg){
+  return [
+    {std:"ESRS 2",   name:"Allmänna krav & styrning",    ok: a[1]&&a[8]&&a[11],   partial: a[1]||a[8]||a[11]},
+    {std:"ESRS E1",  name:"Klimatförändring",             ok: a[2]&&a[3]&&a[4]&&esg.scope1&&esg.scope2, partial: a[2]||a[3]||a[4]||esg.scope1||esg.scope2},
+    {std:"ESRS E2",  name:"Föroreningar",                 ok: false,               partial: esg.waste},
+    {std:"ESRS E3",  name:"Vatten & marina resurser",     ok: false,               partial: esg.water},
+    {std:"ESRS S1",  name:"Egna anställda",               ok: a[5]&&a[6]&&esg.employees, partial: a[5]||a[6]||esg.employees},
+    {std:"ESRS S2",  name:"Arbetstagare i värdekedjan",   ok: a[7],                partial: a[7]},
+    {std:"ESRS G1",  name:"Affärsetik & anti-korruption", ok: a[9]&&esg.antiCorruption&&esg.whistleblower, partial: a[9]||esg.antiCorruption||esg.whistleblower},
+  ];
+}
+function dataScore(esg){
+  var envFields=["scope1","scope2","energy","renewable","water","waste","recycled"];
+  var socFields=["employees","femaleRatio","femaleMgmt","sickLeave","accidents","training"];
+  var govFields=["boardSize","independentBoard","femaleBoard"];
+  function pct(fields){ return Math.round(fields.filter(function(k){return !!esg[k];}).length/fields.length*100); }
+  return {env:pct(envFields), soc:pct(socFields), gov:pct(govFields)};
+}
+
+// ── SVG Stapeldiagram ─────────────────────────────────────────────────────────
+function BarChart(props){
+  var data=props.data, W=480, H=140, pad=40, barW=60, gap=80;
+  var max=Math.max.apply(null,data.map(function(d){return d.v||1;}));
+  return h("svg",{viewBox:"0 0 "+W+" "+H,style:{width:"100%",height:H}},
+    data.map(function(d,i){
+      var bh=max>0?Math.round((d.v/max)*(H-pad-10)):0;
+      var x=60+i*gap, y=H-pad-bh;
+      return h("g",{key:i},
+        h("rect",{x:x,y:y,width:barW,height:bh,fill:GL,rx:4}),
+        h("text",{x:x+barW/2,y:y-5,textAnchor:"middle",fontSize:11,fill:"#374151"},d.v||0),
+        h("text",{x:x+barW/2,y:H-8,textAnchor:"middle",fontSize:11,fill:"#6b7280"},d.n)
+      );
+    }),
+    h("line",{x1:50,y1:H-pad,x2:W-10,y2:H-pad,stroke:"#e5e7eb"})
+  );
+}
+
+// ── SVG Spindeldiagram ────────────────────────────────────────────────────────
+function RadarChart(props){
+  var vals=props.vals, labs=props.labs;
+  var cx=200, cy=170, r=120, n=vals.length;
+  function pt(i,frac){
+    var ang=(i/n)*2*Math.PI - Math.PI/2;
+    return [cx+r*frac*Math.cos(ang), cy+r*frac*Math.sin(ang)];
+  }
+  var gridLevels=[0.25,0.5,0.75,1];
+  var polyPts=vals.map(function(v,i){ var p=pt(i,v/100); return p[0]+","+p[1]; }).join(" ");
+  return h("svg",{viewBox:"0 0 400 340",style:{width:"100%",maxHeight:260}},
+    // grid
+    gridLevels.map(function(f,gi){
+      var pts=labs.map(function(_,i){ var p=pt(i,f); return p[0]+","+p[1]; }).join(" ");
+      return h("polygon",{key:gi,points:pts,fill:"none",stroke:"#e5e7eb",strokeWidth:1});
+    }),
+    // axes
+    labs.map(function(_,i){
+      var p=pt(i,1);
+      return h("line",{key:i,x1:cx,y1:cy,x2:p[0],y2:p[1],stroke:"#e5e7eb",strokeWidth:1});
+    }),
+    // data
+    h("polygon",{points:polyPts,fill:GL,fillOpacity:0.3,stroke:GL,strokeWidth:2}),
+    // labels
+    labs.map(function(l,i){
+      var p=pt(i,1.22);
+      return h("text",{key:i,x:p[0],y:p[1],textAnchor:"middle",dominantBaseline:"middle",fontSize:11,fill:"#4b5563"},l);
+    })
+  );
+}
+
+// ── Stilar (modul-nivå) ───────────────────────────────────────────────────────
+var CARD={background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",padding:"20px 22px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,.05)"};
+var INP={width:"100%",padding:"8px 11px",border:"1px solid #d1d5db",borderRadius:7,fontSize:13,background:"#fff",color:"#111",boxSizing:"border-box",outline:"none"};
+
+// ── Hjälpkomponenter ──────────────────────────────────────────────────────────
+function Lbl(props){ return h("div",{style:{fontSize:12,color:"#4b7a5f",marginBottom:5,fontWeight:600}},props.children); }
+function Fld(props){ return h("div",null, h(Lbl,null,props.label), props.children); }
+function Sec(props){ return h("div",{style:{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.9px",marginBottom:10,paddingBottom:7,borderBottom:"1px solid #f3f4f6"}},props.children); }
+
+// ── Huvud-app ─────────────────────────────────────────────────────────────────
+function App(){
+  var s0=useState(0),             tab=s0[0],     setTab=s0[1];
+  var s1=useState({name:"",size:"Stort (>250 anst.)",industry:"",year:2025}), co=s1[0], setCo=s1[1];
+  var s2=useState({}),            ans=s2[0],     setAns=s2[1];
+  var s3=useState({scope1:"",scope2:"",energy:"",renewable:"",water:"",waste:"",recycled:"",employees:"",femaleRatio:"",femaleMgmt:"",sickLeave:"",accidents:"",training:"",boardSize:"",independentBoard:"",femaleBoard:"",antiCorruption:false,whistleblower:false,esgAudit:false}), esg=s3[0], setEsg=s3[1];
+  var s4=useState(0),             esgTab=s4[0], setEsgTab=s4[1];
+
+  var sc    = score(ans);
+  var ansN  = Object.keys(ans).length;
+  var st    = status(sc);
+  var gaps  = QS.filter(function(q){return ans[q.id]===false;});
+  var rs    = recs(ans,esg);
+  var cvals = catScores(ans);
+  var esrsSt= esrsStatus(ans,esg);
+  var dScore= dataScore(esg);
+
+  function setA(id,v){ setAns(function(p){var n=Object.assign({},p); n[id]=v; return n;}); }
+  function setE(k,v) { setEsg(function(p){var n=Object.assign({},p); n[k]=v;  return n;}); }
+  function setC(k,v) { setCo (function(p){var n=Object.assign({},p); n[k]=v;  return n;}); }
+
+  var TABS=["🏠 Start","📋 Beredskap","📊 ESG-data","💡 Analys & råd","📄 Rapport"];
+
+  return h("div",{style:{fontFamily:"system-ui,sans-serif",background:"#f3f6f4",minHeight:"100vh"}},
+
+    // Header
+    h("div",{style:{background:"linear-gradient(135deg,"+G+","+GL+")",padding:"15px 22px",display:"flex",alignItems:"center",gap:12}},
+      h("span",{style:{fontSize:24}},"🌿"),
+      h("div",null,
+        h("div",{style:{color:"#fff",fontSize:17,fontWeight:700}},"CSRD-verktyget"),
+        h("div",{style:{color:"#a7d9be",fontSize:11,marginTop:1}},"Corporate Sustainability Reporting Directive · Datainsamling & analys")
+      ),
+      co.name && h("div",{style:{marginLeft:"auto",color:"#c4edd7",fontSize:12,fontWeight:600}},co.name)
+    ),
+
+    // Tabs
+    h("div",{style:{background:"#fff",borderBottom:"1px solid #e5e7eb",display:"flex",padding:"0 16px",overflowX:"auto"}},
+      TABS.map(function(t,i){
+        return h("button",{key:i,onClick:function(){setTab(i);},style:{padding:"12px 15px",border:"none",background:"none",cursor:"pointer",fontSize:13,fontWeight:tab===i?700:400,color:tab===i?G:"#6b7280",borderBottom:tab===i?"2.5px solid "+G:"2.5px solid transparent",whiteSpace:"nowrap"}},t);
+      }),
+      ansN>0 && h("div",{style:{marginLeft:"auto",display:"flex",alignItems:"center",paddingRight:4}},
+        h("span",{style:{background:st.bg,color:st.c,border:"1px solid "+st.c+"44",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:700}}, sc+"/12 · "+st.label)
+      )
+    ),
+
+    // Sidor
+    h("div",{style:{maxWidth:860,margin:"0 auto",padding:"20px 16px"}},
+
+      // ── START ──
+      tab===0 && h("div",null,
+        h("div",{style:CARD},
+          h("h2",{style:{fontSize:19,fontWeight:700,color:G,marginBottom:8}},"Välkommen till CSRD-verktyget"),
+          h("p",{style:{color:"#4b5563",lineHeight:1.7,fontSize:13,marginBottom:18}},
+            "Samla in, strukturera och analysera er hållbarhetsdata i enlighet med EU:s CSRD-direktiv. Fyll i uppgifterna steg för steg och få en rapport med konkreta åtgärdsförslag."),
+          h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}},
+            [["📋","Beredskapsanalys","12 frågor om er CSRD-mognad"],
+             ["📊","ESG-datainmatning","Miljö, socialt och styrning"],
+             ["💡","Analys & råd","Konkreta åtgärder baserade på era svar"],
+             ["📄","Rapport","Sammanfattning och nästa steg"],
+             ["🎯","Gapanalys","Tydliga åtgärdspunkter"],
+             ["📜","ESRS-anpassad","Enligt EU:s standarder"]
+            ].map(function(x,i){
+              return h("div",{key:i,style:{background:GP,borderRadius:8,padding:14,border:"1px solid #c9e8d8"}},
+                h("div",{style:{fontSize:20,marginBottom:8}},x[0]),
+                h("div",{style:{fontWeight:700,fontSize:13,marginBottom:3}},x[1]),
+                h("div",{style:{fontSize:11,color:"#6b7280",lineHeight:1.4}},x[2])
+              );
+            })
+          ),
+          h("div",{style:{background:"#dcfce7",borderRadius:8,padding:"11px 15px",fontSize:12,color:"#15803d",border:"1px solid #bbf7d0"}},
+            "ℹ️ CSRD gäller för stora börsnoterade bolag fr.o.m. 2024, övriga stora bolag fr.o.m. 2025 och noterade SME:er fr.o.m. 2026.")
+        ),
+        h("div",{style:CARD},
+          h(Sec,null,"Företagsuppgifter"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+            h(Fld,{label:"Företagsnamn"}, h("input",{style:INP,placeholder:"t.ex. Andersson Fastigheter AB",value:co.name,onChange:function(e){setC("name",e.target.value);}})),
+            h(Fld,{label:"Bransch"},      h("input",{style:INP,placeholder:"t.ex. Fastigheter, Tillverkning",value:co.industry,onChange:function(e){setC("industry",e.target.value);}})),
+            h(Fld,{label:"Företagsstorlek"},
+              h("select",{style:INP,value:co.size,onChange:function(e){setC("size",e.target.value);}},
+                h("option",null,"Stort börsnoterat (>500 anst.) – krav fr.o.m. 2024"),
+                h("option",null,"Stort (>250 anst.) – krav fr.o.m. 2025"),
+                h("option",null,"Litet/medelstort noterat – krav fr.o.m. 2026"),
+                h("option",null,"Mikrobolag – undantaget från CSRD")
+              )
+            ),
+            h(Fld,{label:"Rapporteringsår"}, h("input",{style:INP,type:"number",value:co.year,onChange:function(e){setC("year",e.target.value);}}))
+          ),
+          h("button",{onClick:function(){setTab(1);},style:{marginTop:18,padding:"10px 24px",background:G,color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}},
+            "Starta beredskapsanalysen →")
+        )
+      ),
+
+      // ── BEREDSKAP ──
+      tab===1 && h("div",null,
+        h("div",{style:CARD},
+          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}},
+            h("div",null,
+              h("h2",{style:{fontSize:17,fontWeight:700,color:G,marginBottom:4}},"Beredskapsanalys"),
+              h("p",{style:{fontSize:12,color:"#6b7280"}},ansN+"/12 frågor besvarade")
+            ),
+            ansN>0 && h("div",{style:{textAlign:"right"}},
+              h("div",{style:{fontSize:26,fontWeight:700,color:st.c,lineHeight:1}},sc,h("span",{style:{fontSize:14,color:"#9ca3af"}},"/12")),
+              h("div",{style:{fontSize:11,color:st.c,fontWeight:700,marginTop:3}},st.label)
+            )
+          ),
+          h("div",{style:{background:"#f0fdf4",borderRadius:100,height:5,marginBottom:14}},
+            h("div",{style:{background:GL,height:5,borderRadius:100,width:(ansN/12*100)+"%",transition:"width .3s"}})
+          ),
+          CATS.map(function(cat){
+            return h("div",{key:cat,style:{marginBottom:18}},
+              h(Sec,null,cat),
+              QS.filter(function(q){return q.cat===cat;}).map(function(q,qi,arr){
+                return h("div",{key:q.id,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:qi<arr.length-1?"1px solid #f9fafb":"none"}},
+                  h("div",{style:{fontSize:13,flex:1,paddingRight:14,lineHeight:1.55,color:ans[q.id]===undefined?"#111":ans[q.id]?"#15803d":"#dc2626"}},q.q),
+                  h("div",{style:{display:"flex",gap:6,flexShrink:0}},
+                    [true,false].map(function(val){
+                      var active=ans[q.id]===val;
+                      return h("button",{key:String(val),onClick:function(){setA(q.id,val);},style:{padding:"5px 16px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:active?700:400,border:"1px solid "+(active?(val?"#16a34a":"#dc2626"):"#d1d5db"),background:active?(val?"#f0fdf4":"#fef2f2"):"#fff",color:active?(val?"#16a34a":"#dc2626"):"#6b7280"}},
+                        val?"Ja":"Nej");
+                    })
+                  )
+                );
+              })
+            );
+          }),
+          ansN===12 && h("div",{style:{padding:"12px 16px",background:st.bg,border:"1px solid "+st.c+"44",borderRadius:8,marginTop:8}},
+            h("div",{style:{fontWeight:700,color:st.c,marginBottom:3}},"Resultat: "+sc+"/12 – "+st.label),
+            h("div",{style:{fontSize:12,color:"#6b7280"}},gaps.length===0?"Alla nyckelprocesser finns på plats. 🎉":gaps.length+" område"+(gaps.length>1?"n":"")+" kräver åtgärd.")
+          )
+        ),
+        ansN>=5 && h("div",{style:CARD},
+          h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"Beredskap per område"),
+          h("p",{style:{fontSize:12,color:"#6b7280",marginBottom:12}},"Procentuell mognad per CSRD-kategori"),
+          h(RadarChart,{vals:cvals,labs:CATS})
+        )
+      ),
+
+      // ── ESG DATA ──
+      tab===2 && h("div",{style:CARD},
+        h("h2",{style:{fontSize:17,fontWeight:700,color:G,marginBottom:4}},"ESG-datainmatning"),
+        h("p",{style:{fontSize:12,color:"#6b7280",marginBottom:18}},"Fyll i er hållbarhetsdata inom de tre CSRD-pelarna."),
+        h("div",{style:{display:"flex",gap:4,marginBottom:22,background:"#f9fafb",padding:4,borderRadius:8,width:"fit-content",border:"1px solid #e5e7eb"}},
+          ["🌱 Miljö (E)","👥 Socialt (S)","🏛 Styrning (G)"].map(function(l,i){
+            return h("button",{key:i,onClick:function(){setEsgTab(i);},style:{padding:"7px 16px",border:"none",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:esgTab===i?700:400,background:esgTab===i?"#fff":"transparent",color:esgTab===i?G:"#6b7280",boxShadow:esgTab===i?"0 1px 4px rgba(0,0,0,.08)":"none"}},l);
+          })
+        ),
+        esgTab===0 && h("div",null,
+          h(Sec,null,"Klimat & energi"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+            [["scope1","Scope 1-utsläpp (ton CO₂e/år)","t.ex. 450"],["scope2","Scope 2-utsläpp (ton CO₂e/år)","t.ex. 820"],
+             ["energy","Total energiförbrukning (MWh/år)","t.ex. 5200"],["renewable","Andel förnybar energi (%)","t.ex. 35"],
+             ["water","Vattenförbrukning (m³/år)","t.ex. 1200"],["waste","Avfall genererat (ton/år)","t.ex. 18"],
+             ["recycled","Andel återvunnet avfall (%)","t.ex. 72"]
+            ].map(function(x){return h(Fld,{key:x[0],label:x[1]},h("input",{style:INP,type:"number",placeholder:x[2],value:esg[x[0]],onChange:function(e){setE(x[0],e.target.value);}}));})
+          )
+        ),
+        esgTab===1 && h("div",null,
+          h(Sec,null,"Arbetsvillkor & mångfald"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+            [["employees","Antal anställda (FTE)","t.ex. 342"],["femaleRatio","Andel kvinnor totalt (%)","t.ex. 38"],
+             ["femaleMgmt","Andel kvinnor i ledning (%)","t.ex. 31"],["sickLeave","Sjukfrånvaro (%)","t.ex. 4.2"],
+             ["accidents","Arbetsplatsolyckor (antal/år)","t.ex. 3"],["training","Utbildningstimmar per anst./år","t.ex. 28"]
+            ].map(function(x){return h(Fld,{key:x[0],label:x[1]},h("input",{style:INP,type:"number",placeholder:x[2],value:esg[x[0]],onChange:function(e){setE(x[0],e.target.value);}}));})
+          )
+        ),
+        esgTab===2 && h("div",null,
+          h(Sec,null,"Styrelse & transparens"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}},
+            [["boardSize","Antal styrelseledamöter","t.ex. 8"],["independentBoard","Andel oberoende ledamöter (%)","t.ex. 62"],["femaleBoard","Andel kvinnor i styrelse (%)","t.ex. 37"]]
+            .map(function(x){return h(Fld,{key:x[0],label:x[1]},h("input",{style:INP,type:"number",placeholder:x[2],value:esg[x[0]],onChange:function(e){setE(x[0],e.target.value);}}));})
+          ),
+          h(Sec,null,"Policyer & system"),
+          [["antiCorruption","Anti-korruptionspolicy finns"],["whistleblower","Whistleblower-system finns"],["esgAudit","ESG-data granskas av extern revisor"]]
+          .map(function(x){
+            return h("label",{key:x[0],style:{display:"flex",alignItems:"center",gap:8,marginBottom:12,cursor:"pointer",fontSize:13}},
+              h("input",{type:"checkbox",checked:esg[x[0]],onChange:function(e){setE(x[0],e.target.checked);},style:{width:16,height:16,accentColor:G}}),x[1]);
+          })
+        )
+      ),
+
+      // ── ANALYS & RÅD ──
+      tab===3 && h("div",null,
+
+        // Statusbanner
+        h("div",{style:Object.assign({},CARD,{borderLeft:"4px solid "+st.c,paddingLeft:18,marginBottom:14})},
+          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}},
+            h("div",null,
+              h("h2",{style:{fontSize:17,fontWeight:700,color:G,marginBottom:4}},"Analys & råd"),
+              h("p",{style:{fontSize:12,color:"#6b7280"}},"Baserat på "+ansN+" av 12 besvarade frågor och inmatad ESG-data")
+            ),
+            h("div",{style:{textAlign:"right"}},
+              h("div",{style:{fontSize:28,fontWeight:700,color:st.c,lineHeight:1}},sc+"/12"),
+              h("div",{style:{fontSize:12,color:st.c,fontWeight:700,marginTop:2}},st.label)
+            )
+          ),
+          ansN<12 && h("div",{style:{marginTop:12,background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:7,padding:"10px 14px",fontSize:12,color:"#92400e"}},
+            "⚠️ Fyll i alla 12 frågor i Beredskapsanalysen för fullständig analys. Nuvarande analys baseras på "+ansN+" svar.")
+        ),
+
+        // ESRS-täckning
+        h("div",{style:CARD},
+          h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"ESRS-täckningsöversikt"),
+          h("p",{style:{fontSize:12,color:"#6b7280",marginBottom:14}},"Status per EU-standard baserat på era svar och ESG-data"),
+          h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+            esrsStatus(ans,esg).map(function(s,i){
+              var isOk=s.ok, isPart=!s.ok&&s.partial;
+              var color=isOk?"#16a34a":isPart?"#d97706":"#dc2626";
+              var bg=isOk?"#f0fdf4":isPart?"#fffbeb":"#fef2f2";
+              var label=isOk?"Redo":isPart?"Delvis redo":"Ej påbörjat";
+              return h("div",{key:i,style:{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:bg,borderRadius:8,border:"1px solid "+color+"33"}},
+                h("div",{style:{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}),
+                h("div",{style:{fontWeight:700,fontSize:13,color:G,width:80,flexShrink:0}},s.std),
+                h("div",{style:{fontSize:13,color:"#374151",flex:1}},s.name),
+                h("span",{style:{fontSize:11,fontWeight:700,color:color,background:"#fff",border:"1px solid "+color+"44",borderRadius:20,padding:"2px 10px",flexShrink:0}},label)
+              );
+            })
+          )
+        ),
+
+        // Datakvalitet
+        (function(){
+          var ds=dataScore(esg);
+          return h("div",{style:CARD},
+            h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"Datakvalitet ESG"),
+            h("p",{style:{fontSize:12,color:"#6b7280",marginBottom:16}},"Andel ifyllda datapunkter per pelare"),
+            h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}},
+              [["🌱","Miljö (E)",ds.env,"#16a34a"],["👥","Socialt (S)",ds.soc,"#2563eb"],["🏛","Styrning (G)",ds.gov,"#7c3aed"]].map(function(x,i){
+                return h("div",{key:i},
+                  h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:6}},
+                    h("span",{style:{fontSize:13,fontWeight:600}},x[0]+" "+x[1]),
+                    h("span",{style:{fontSize:13,fontWeight:700,color:x[2]>60?x[3]:"#9ca3af"}},x[2]+"%")
+                  ),
+                  h("div",{style:{background:"#e5e7eb",borderRadius:100,height:8}},
+                    h("div",{style:{background:x[2]>60?x[3]:"#9ca3af",height:8,borderRadius:100,width:x[2]+"%",transition:"width .4s"}})
+                  ),
+                  h("div",{style:{fontSize:11,color:"#9ca3af",marginTop:4}},x[2]<40?"Komplettera ESG-data":x[2]<80?"På god väg":"Komplett")
+                );
+              })
+            )
+          );
+        })(),
+
+        // Prioriterade åtgärder
+        h("div",{style:CARD},
+          h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"Prioriterade åtgärder"),
+          h("p",{style:{fontSize:12,color:"#6b7280",marginBottom:16}},"Baserade på era svar – sorterade efter prioritet"),
+          h("div",{style:{display:"flex",flexDirection:"column",gap:14}},
+            rs.map(function(r,i){
+              return h("div",{key:i,style:{border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden"}},
+                // Header
+                h("div",{style:{background:r.priBg,borderBottom:"1px solid "+r.priC+"22",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}},
+                  h("span",{style:{fontSize:20}},r.i),
+                  h("div",{style:{flex:1}},
+                    h("div",{style:{fontWeight:700,fontSize:14,color:G}},r.t),
+                    h("div",{style:{fontSize:11,color:"#6b7280",marginTop:2}},r.effort+" · "+r.e)
+                  ),
+                  h("span",{style:{fontSize:11,fontWeight:700,color:r.priC,background:"#fff",border:"1px solid "+r.priC+"44",borderRadius:20,padding:"3px 10px",flexShrink:0}},r.pri)
+                ),
+                // Body
+                h("div",{style:{padding:"14px 16px",background:"#fff"}},
+                  h("p",{style:{fontSize:13,color:"#374151",lineHeight:1.65,marginBottom:12}},r.d),
+                  h("div",{style:{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:8}},"Konkreta steg"),
+                  h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+                    r.steps.map(function(s,si){
+                      return h("div",{key:si,style:{display:"flex",gap:8,alignItems:"flex-start"}},
+                        h("div",{style:{flexShrink:0,width:18,height:18,borderRadius:"50%",background:GL,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}},si+1),
+                        h("div",{style:{fontSize:13,color:"#374151",lineHeight:1.5}},s)
+                      );
+                    })
+                  )
+                )
+              );
+            })
+          )
+        ),
+
+        // Tidsplan
+        h("div",{style:Object.assign({},CARD,{background:GP,border:"1px solid #c9e8d8"})},
+          h("h3",{style:{fontSize:14,fontWeight:700,color:G,marginBottom:14}},"📅 Föreslagen handlingsplan"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}},
+            [
+              {q:"Kvartal 1",color:"#dc2626",items:["Utse CSRD-ansvarig","Starta dubbel väsentlighetsanalys","Kartlägg Scope 1 & 2-datakällor"]},
+              {q:"Kvartal 2",color:"#d97706",items:["Genomför väsentlighetsanalys","Sätt upp datainsamlingssystem","Upprätta/uppdatera ESG-policyer"]},
+              {q:"Kvartal 3",color:"#2563eb",items:["Presentera ESG-data för styrelsen","Sätt klimatmål","Inled kontakt med revisor"]},
+              {q:"Kvartal 4",color:"#16a34a",items:["Konsolidera årets ESG-data","Revisorsgranskning (limited assurance)","Publicera hållbarhetsrapport"]},
+            ].map(function(p,i){
+              return h("div",{key:i,style:{background:"#fff",borderRadius:8,padding:14,border:"1px solid #c9e8d8"}},
+                h("div",{style:{fontSize:12,fontWeight:700,color:p.color,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.6px"}},p.q),
+                h("div",{style:{display:"flex",flexDirection:"column",gap:5}},
+                  p.items.map(function(item,ii){
+                    return h("div",{key:ii,style:{display:"flex",gap:7,alignItems:"flex-start"}},
+                      h("span",{style:{color:p.color,flexShrink:0,fontSize:13}},"→"),
+                      h("span",{style:{fontSize:12,color:"#374151",lineHeight:1.5}},item)
+                    );
+                  })
+                )
+              );
+            })
+          )
+        )
+      ),
+
+      // ── RAPPORT ──
+      tab===4 && h("div",null,
+        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:14}},
+          [{label:"Beredskapspoäng",val:sc+"/12",sub:st.label,c:st.c,bc:st.c},
+           {label:"Identifierade brister",val:gaps.length,sub:"av 12 kontrollpunkter",c:"#2563eb",bc:"#2563eb"},
+           {label:"ESG-datapunkter",val:[esg.scope1,esg.scope2,esg.energy,esg.employees,esg.boardSize].filter(Boolean).length,sub:"nyckeltal inmatade",c:"#d97706",bc:"#d97706"}
+          ].map(function(s,i){
+            return h("div",{key:i,style:Object.assign({},CARD,{marginBottom:0,borderLeft:"3px solid "+s.bc,paddingLeft:16})},
+              h("div",{style:{fontSize:11,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:6,fontWeight:700}},s.label),
+              h("div",{style:{fontSize:28,fontWeight:700,color:s.c,lineHeight:1}},s.val),
+              h("div",{style:{fontSize:11,color:"#6b7280",marginTop:4}},s.sub)
+            );
+          })
+        ),
+
+        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}},
+          h("div",{style:CARD},
+            h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"Beredskap per område"),
+            h("p",{style:{fontSize:11,color:"#6b7280",marginBottom:10}},"Procentuell mognad"),
+            ansN>=3 ? h(RadarChart,{vals:cvals,labs:CATS})
+                    : h("div",{style:{height:200,display:"flex",alignItems:"center",justifyContent:"center",color:"#9ca3af",fontSize:12}},"Besvara minst 3 frågor")
+          ),
+          h("div",{style:CARD},
+            h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"Åtgärdslista"),
+            h("p",{style:{fontSize:11,color:"#6b7280",marginBottom:10}},'Frågor besvarade "nej"'),
+            gaps.length===0
+              ? h("div",{style:{padding:"12px 14px",background:"#f0fdf4",borderRadius:7,color:"#16a34a",fontSize:12,fontWeight:700}},"✅ Inga brister identifierade")
+              : h("div",{style:{maxHeight:240,overflowY:"auto"}},
+                  gaps.map(function(q,i){
+                    return h("div",{key:q.id,style:{display:"flex",gap:8,padding:"7px 0",borderBottom:i<gaps.length-1?"1px solid #f9fafb":"none",alignItems:"flex-start"}},
+                      h("span",{style:{color:"#dc2626",flexShrink:0}},"⚠"),
+                      h("div",{style:{fontSize:12,lineHeight:1.5}},q.q)
+                    );
+                  })
+                )
+          )
+        ),
+
+        h("div",{style:CARD},
+          h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:14}},"ESG-nyckeltal"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}},
+            [["🏭","Scope 1",esg.scope1,"#dc2626"],["⚡","Scope 2",esg.scope2,"#d97706"],
+             ["🔋","Energi (MWh)",esg.energy,"#2563eb"],["☀️","Förnybar %",esg.renewable?esg.renewable+"%":"","#16a34a"],
+             ["👥","Anställda",esg.employees,"#7c3aed"],["⚖️","Andel kvinnor",esg.femaleRatio?esg.femaleRatio+"%":"","#db2777"],
+             ["🏥","Sjukfrånvaro",esg.sickLeave?esg.sickLeave+"%":"","#d97706"],["🏛","Styrelse",esg.boardSize,"#0891b2"]
+            ].map(function(x,i){
+              return h("div",{key:i,style:{background:"#f9fafb",borderRadius:8,padding:"12px 14px",border:"1px solid #e5e7eb",textAlign:"center"}},
+                h("div",{style:{fontSize:18,marginBottom:7}},x[0]),
+                h("div",{style:{fontSize:20,fontWeight:700,color:x[3],opacity:x[2]?1:0.25}},x[2]||"—"),
+                h("div",{style:{fontSize:11,color:"#9ca3af",marginTop:3}},x[1])
+              );
+            })
+          )
+        ),
+
+        (esg.scope1||esg.scope2) && h("div",{style:CARD},
+          h("h3",{style:{fontSize:14,fontWeight:700,marginBottom:3}},"Utsläppsöversikt"),
+          h("p",{style:{fontSize:11,color:"#6b7280",marginBottom:14}},"Scope 1 och Scope 2 (ton CO₂e)"),
+          h(BarChart,{data:[{n:"Scope 1",v:parseFloat(esg.scope1)||0},{n:"Scope 2",v:parseFloat(esg.scope2)||0}]})
+        ),
+
+        h("div",{style:Object.assign({},CARD,{background:GP,border:"1px solid #c9e8d8"})},
+          h("h3",{style:{fontSize:14,fontWeight:700,color:G,marginBottom:12}},"🎯 Rekommenderade nästa steg"),
+          [gaps.length>0 && 'Åtgärda identifierade brister – börja med: "'+gaps[0].q+'"',
+           !esg.scope1&&!esg.scope2 && "Mät och dokumentera era Scope 1- och Scope 2-utsläpp",
+           !esg.employees && "Samla in personaldata: anställda, mångfald och sjukfrånvaro",
+           !esg.antiCorruption && "Implementera en anti-korruptionspolicy om ni saknar en",
+           sc<8 && "Utse en ansvarig för hållbarhetsrapportering",
+           ansN<12 && "Slutför beredskapsanalysen för fullständig gapanalys",
+           "Genomför en analys av dubbel väsentlighet (krav i ESRS 2)"
+          ].filter(Boolean).slice(0,5).map(function(step,i){
+            return h("div",{key:i,style:{display:"flex",gap:10,padding:"8px 0",borderBottom:i<4?"1px solid #c9e8d8":"none",alignItems:"flex-start"}},
+              h("div",{style:{flexShrink:0,width:22,height:22,borderRadius:"50%",background:G,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}},i+1),
+              h("div",{style:{fontSize:13,color:"#1a3d2b",lineHeight:1.5}},step)
+            );
+          })
+        )
+      )
+
+    ) // content
+  ); // app div
+} // App
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
